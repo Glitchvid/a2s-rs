@@ -288,7 +288,7 @@ impl A2SClient {
     pub async fn info<A: ToSocketAddrs>(&self, addr: A) -> Result<Info> {
         let data = self.send(&INFO_REQUEST, &addr).await?;
         let mut packet = Cursor::new(&data);
-       // Response byte.
+        // Response byte.
         match packet.read_u8()? {
             // S2C_CHALLENGE
             b'A' => {
@@ -314,7 +314,7 @@ impl A2SClient {
     pub fn info<A: ToSocketAddrs>(&self, addr: A) -> Result<Info> {
         let data = self.send(&INFO_REQUEST, &addr)?;
         let mut packet = Cursor::new(&data);
-       // Response byte.
+        // Response byte.
         match packet.read_u8()? {
             // S2C_CHALLENGE
             b'A' => {
