@@ -1,5 +1,5 @@
 use std::convert::TryFrom;
-use std::io::{Cursor, ErrorKind, Seek, SeekFrom, Write, Read};
+use std::io::{Cursor, ErrorKind, Write, Read};
 #[cfg(not(feature = "async"))]
 use std::net::ToSocketAddrs;
 
@@ -190,6 +190,10 @@ impl TryFrom<u8> for ServerOS {
 
 impl A2SClient {
     fn read_info_data(&self, mut data: Cursor<Vec<u8>>) -> Result<Info> {
+        if data.read_u8()? != b'I' {
+            return Err(Error::InvalidResponse);
+        }
+
         let protocol = data.read_u8()?;
         let name = data.read_cstring()?;
         let map = data.read_cstring()?;
@@ -283,23 +287,21 @@ impl A2SClient {
     #[cfg(feature = "async")]
     pub async fn info<A: ToSocketAddrs>(&self, addr: A) -> Result<Info> {
         let data = self.send(&INFO_REQUEST, &addr).await?;
-        let mut cursor = Cursor::new(data);
+        let mut packet = Cursor::new(&data);
        // Response byte.
-        match cursor.read_u8()? {
+        match packet.read_u8()? {
             // S2C_CHALLENGE
             b'A' => {
                 let mut new_req: Vec<u8> = Vec::with_capacity(INFO_REQUEST.len());
                 // Add initial request
                 new_req.write_all(&INFO_REQUEST)?;
                 // Add the entirety of the challenge-response bytes
-                cursor.read_to_end(&mut new_req)?;
-                cursor = Cursor::new(self.send(new_req.as_ref(), &addr).await?);
-                // Advance the new cursor past the response byte.
-                cursor.seek(SeekFrom::Start(1))?;
-                return self.read_info_data(cursor);
+                packet.read_to_end(&mut new_req)?;
+                let data = self.send(&new_req, &addr).await?;
+                return self.read_info_data(Cursor::new(data));
             }
             // S2A_INFO_SRC
-            b'I' => self.read_info_data(cursor),
+            b'I' => self.read_info_data(Cursor::new(data)),
             _ => Err(Error::InvalidResponse),
         }
     }
@@ -311,23 +313,21 @@ impl A2SClient {
     #[cfg(not(feature = "async"))]
     pub fn info<A: ToSocketAddrs>(&self, addr: A) -> Result<Info> {
         let data = self.send(&INFO_REQUEST, &addr)?;
-        let mut cursor = Cursor::new(data);
-        // Response byte.
-        match cursor.read_u8()? {
+        let mut packet = Cursor::new(&data);
+       // Response byte.
+        match packet.read_u8()? {
             // S2C_CHALLENGE
             b'A' => {
                 let mut new_req: Vec<u8> = Vec::with_capacity(INFO_REQUEST.len());
                 // Add initial request
                 new_req.write_all(&INFO_REQUEST)?;
                 // Add the entirety of the challenge-response bytes
-                cursor.read_to_end(&mut new_req)?;
-                cursor = Cursor::new(self.send(new_req.as_ref(), &addr)?);
-                // Advance the new cursor past the response byte.
-                cursor.seek(SeekFrom::Start(1))?;
-                return self.read_info_data(cursor);
+                packet.read_to_end(&mut new_req)?;
+                let data = self.send(&new_req, &addr)?;
+                return self.read_info_data(Cursor::new(data));
             }
             // S2A_INFO_SRC
-            b'I' => self.read_info_data(cursor),
+            b'I' => self.read_info_data(Cursor::new(data)),
             _ => Err(Error::InvalidResponse),
         }
     }
