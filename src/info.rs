@@ -339,7 +339,10 @@ impl Info {
             source_tv,
         })
     }
+}
 
+
+impl A2SClient {
     /// Gets **A2S_INFO**
     ///
     /// On newer builds of steamworks this may require two trips for handling
